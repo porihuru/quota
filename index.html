@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <!-- v2025.11.08-p12i -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>見積書 / 市場価格調査票（pdfmake+NotoSansJP） v2025.11.08-p12i</title>
+  <style>
+    :root{ --bg:#f7f7f8; --line:#e6e6e8; --ink:#111; --muted:#666; --hint-bg:#eef6ff; --hint-bd:#c9ddff; --hint-fc:#0b3a82; }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{ margin:0; background:var(--bg); color:var(--ink);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI","YuGothic",sans-serif;
+      line-height:1.6; -webkit-text-size-adjust:100%; }
+
+    /* 固定ツールバー */
+    .toolbar{ position:fixed; top:0; left:0; right:0; z-index:1000;
+      background:#fff; border-bottom:1px solid var(--line);
+      display:flex; gap:8px; align-items:center; padding:8px 10px; flex-wrap:wrap;
+      box-shadow:0 2px 10px rgba(0,0,0,.04) }
+    .toolbar button{border:1px solid var(--line); background:#fff; padding:8px 12px; border-radius:10px; font-size:14px; cursor:pointer}
+    .toolbar button:disabled{opacity:.5; cursor:not-allowed}
+    .ver{font:12px/1.3 ui-monospace,Menlo,Consolas,monospace; color:#555; margin-left:auto; white-space:nowrap}
+    .stat{font:12px/1.3 ui-sans-serif; margin-left:8px; color:#444}
+    .stat b.ok{color:#2e7d32} .stat b.ng{color:#c62828}
+
+    /* 本文 */
+    .wrap{max-width:1080px;margin:14px auto;padding:16px;background:#fff;border:1px solid var(--line);border-radius:14px}
+    .msg{color:#b00020;font-size:13px;margin:6px 0 12px; white-space:pre-wrap}
+    h1{font-size:26px;letter-spacing:.04em;margin:0 0 8px; display:flex; align-items:center; gap:8px}
+
+    /* 薄い青（帳票選択・発行元・単価） */
+    #titleSel,#from_free,input.price{
+      background:var(--hint-bg); border:1px solid var(--hint-bd); outline:none;
+      transition:box-shadow .15s,border-color .15s,background-color .15s
+    }
+    #titleSel:focus,#from_free:focus,input.price:focus{
+      border-color:var(--hint-fc);
+      box-shadow:0 0 0 3px color-mix(in srgb, var(--hint-fc) 25%, transparent);
+      background:#e7f1ff
+    }
+    #titleSel{font:14px/1.2 "Noto Sans JP",system-ui,sans-serif; padding:6px 10px; border-radius:8px}
+
+    .meta{display:grid;gap:6px;color:#444;margin:8px 0 12px}
+    .meta .row{display:flex;gap:10px;align-items:center}
+    .meta .row label{white-space:nowrap}
+    .input{border:1px solid var(--line); border-radius:8px; padding:6px 8px; font:14px/1.3 "Noto Sans JP",system-ui,sans-serif; background:#fff}
+
+    hr{border:none;border-top:1px solid var(--line);margin:12px 0}
+
+    table{width:100%;border-collapse:collapse}
+    thead th{background:#fafafa;border:1px solid var(--line);padding:8px;font-size:14px;white-space:nowrap}
+    tbody td{border:1px solid var(--line);padding:8px;font-size:14px;vertical-align:top}
+    .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+
+    .lead-total{display:inline-flex; align-items:baseline; gap:10px; margin:8px 0 6px;
+      background:#f5f7ff; border:1px solid var(--line); padding:8px 12px; border-radius:10px}
+    .lead-total .lead-ttl{font-weight:700; color:#223}
+    .lead-total .lead-val{font-variant-numeric:tabular-nums}
+
+    .sumbox{margin-top:14px;max-width:420px;margin-left:auto;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+    .sumbox .row{display:grid;grid-template-columns:1fr auto}
+    .sumbox .row div{padding:10px 12px}
+    .sumbox .ttl{color:#333}.sumbox .val{text-align:right;font-variant-numeric:tabular-nums}.sumbox .strong{font-weight:700}
+
+    #from_free{width:100%;border-radius:8px;padding:8px 10px; font:14px/1.5 "Noto Sans JP",system-ui,sans-serif; resize:vertical; min-height:6.5em}
+    input.price, input.textbox, textarea.textbox{ width:100%; border:1px solid var(--line); border-radius:6px; padding:6px 8px; font:14px/1.4 "Noto Sans JP",system-ui,sans-serif }
+    /* ← 1行で収まる時は1行高。折り返し発生時のみ自動伸長 */
+    textarea.textbox.ta{ resize:none; overflow:hidden; line-height:1.5; min-height:0; height:auto }
+
+    #notes{white-space:pre-wrap;font-size:13px;color:#333}
+
+    .pvbox{margin-top:16px}
+    #pvwrap{border:1px solid var(--line);border-radius:10px;background:#fafafa;min-height:60vh}
+    iframe#pv{width:100%;height:70vh;border:0;border-radius:10px;display:block}
+
+    @media (max-width:640px){
+      .wrap{margin:0;border-radius:0;border:none;min-height:100dvh}
+      h1{font-size:20px}
+      table thead{display:none} table,tbody,tr,td{display:block;width:100%}
+      tbody tr{border:1px solid var(--line);border-radius:12px;padding:8px;margin:10px 0;background:#fff}
+      tbody td{border:none;padding:6px 4px;font-size:14px;display:grid;grid-template-columns:7em 1fr;gap:8px}
+      tbody td::before{content:attr(data-label);color:var(--muted);font-size:12px;align-self:center}
+      tbody td.num{justify-items:end} tbody td.num::before{justify-self:start}
+      .sumbox{position:sticky;bottom:0;background:#fff;box-shadow:0 -6px 18px rgba(0,0,0,.06);
+        margin:12px -4px 0;max-width:none;border:none;border-top:1px solid var(--line);border-radius:10px 10px 0 0}
+      .sumbox .row div{padding:10px 14px}
+      iframe#pv{height:60vh}
+    }
+    @media print{ .toolbar,.msg,.pvbox{display:none} @page{size:A4;margin:12mm} }
+  </style>
+</head>
+<body>
+
+  <div class="toolbar" id="toolbar">
+    <button id="btn-preview"  type="button" onclick="__click('preview')"  disabled>PDFプレビュー</button>
+    <button id="btn-download" type="button" onclick="__click('download')" disabled>PDFダウンロード</button>
+    <button id="btn-share"    type="button" onclick="__click('share')"    disabled>メールにPDF添付</button>
+    <button id="btn-mailto"   type="button" onclick="__click('mailto')"   disabled>メール起動（添付は手動）</button>
+    <span class="ver"  id="ver">v2025.11.08-p12i</span>
+    <span class="stat" id="stat"></span>
+  </div>
+
+  <div class="wrap">
+    <div id="msg" class="msg"></div>
+
+    <h1>
+      <span id="title">見積書</span>
+      <select id="titleSel" aria-label="帳票種別">
+        <option>見積書</option>
+        <option>市場価格調査票</option>
+      </select>
+    </h1>
+
+    <div class="meta">
+      <div class="row">
+        <label>見積番号：</label><span id="qno">—</span>
+      </div>
+      <div class="row">
+        <label for="date_input">発行日：</label>
+        <input id="date_input" class="input" type="date" inputmode="none">
+        <small style="color:#666">（PDF・件名・ファイル名に反映）</small>
+      </div>
+    </div>
+    <hr>
+
+    <div><strong>宛先：</strong><br>
+      <span id="to_name"></span><br>
+      <span id="to_addr"></span><br>
+      <span id="to_tel"></span><br>
+      <span id="to_attn"></span>
+    </div>
+
+    <hr>
+    <div><strong>発行元：</strong><br>
+      <textarea id="from_free" rows="5" placeholder="発行元の任意テキスト（5行まで）"></textarea>
+      <span id="from_name" hidden></span>
+      <span id="from_addr" hidden></span>
+      <span id="from_tel"  hidden></span>
+      <span id="from_mail" hidden></span>
+    </div>
+
+    <div class="lead-total" aria-label="見積金額">
+      <span class="lead-ttl">見積金額</span>
+      <span id="lead_total" class="lead-val">¥0</span>
+    </div>
+
+    <table id="items">
+      <thead>
+        <tr>
+          <th style="width:60px">No</th><th>品名</th><th style="width:16%">規格</th>
+          <th style="width:10%">数量</th><th style="width:8%">単位</th>
+          <th style="width:14%">単価</th><th style="width:14%">金額</th><th style="width:14%">備考</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <div class="sumbox" aria-label="合計">
+      <div class="row"><div class="ttl strong" id="grand_label">合計</div><div class="val strong" id="grand">¥0</div></div>
+    </div>
+
+    <div id="notes"></div>
+
+    <div class="pvbox">
+      <div id="log" class="msg" style="margin-top:4px;color:#555">（プレビュー未生成）</div>
+      <div id="pvwrap"><iframe id="pv" title="PDFプレビュー"></iframe></div>
+    </div>
+  </div>
+
+  <script>const APP_VER="v2025.11.08-p12i"; console.log("quotation app", APP_VER);</script>
+  <script src="./pdfmake.min.js?v=v2025.11.08-p12i"></script>
+  <script src="./vfs_fonts.js?v=v2025.11.08-p12i"></script>
+  <script src="./quotation_data.js?v=v2025.11.08-p12i" onerror="window.__dataJsError=true"></script>
+
+  <script>
+  const $=id=>document.getElementById(id);
+  const fmtJPYflex = n => new Intl.NumberFormat('ja-JP',{style:'currency',currency:'JPY',minimumFractionDigits:0,maximumFractionDigits:4}).format((n??0));
+  const fmtNoYen  = n => new Intl.NumberFormat('ja-JP',{minimumFractionDigits:0,maximumFractionDigits:4}).format((n??0));
+  const toNum=s=>(s==null||s==="")?0:(isFinite(+s)?+s:Number(String(s).replace(/[^\d.-]/g,''))||0);
+  const isIOS=/iP(ad|hone|od)/.test(navigator.userAgent);
+  const log=m=>$("log").textContent=m||""; const setMsg=t=>$("msg").textContent=t||"";
+
+  /* 1行→必要時のみ伸長 */
+  function autoGrow(el){
+    el.style.height='auto';
+    el.style.overflow='hidden';
+    const lh=parseFloat(getComputedStyle(el).lineHeight)||20;
+    el.style.height=Math.max(el.scrollHeight, lh)+'px';
+  }
+
+  const LAST_RUN={}; function runOnce(k,fn){const n=Date.now();if(n-(LAST_RUN[k]||0)<800)return;LAST_RUN[k]=n;try{fn();}finally{}}
+
+  function setStat(){
+    if(window.pdfMake&&!pdfMake.vfs&&window.vfs) pdfMake.vfs=window.vfs;
+    const ok=s=>`<b class="ok">${s}</b>`, ng=s=>`<b class="ng">${s}</b>`;
+    const hasPdf=!!window.pdfMake, hasVfs=!!(window.pdfMake&&pdfMake.vfs&&Object.keys(pdfMake.vfs||{}).length);
+    const hasData=!!(window.QUOTATION_DATA&&typeof window.QUOTATION_DATA==="object");
+    $("stat").innerHTML=`pdfmake:${hasPdf?ok("OK"):ng("NG")} | vfs:${hasVfs?ok("OK"):ng("NG")} | data:${hasData?ok("OK"):ng("NG")}`;
+  }
+
+  function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+  /* 固定ツールバー分の上余白を確保 */
+  function applyToolbarPadding(){
+    const tb=$("toolbar"); if(!tb) return;
+    const h = tb.getBoundingClientRect().height;
+    document.body.style.paddingTop = `calc(${h}px + env(safe-area-inset-top, 0px))`;
+  }
+
+  /* 日付ユーティリティ：入力<->表示 */
+  function todayInputValue(){ const d=new Date(); return d.toISOString().slice(0,10); } // YYYY-MM-DD
+  function slashFromInput(v){ return v ? v.replaceAll('-','/') : ""; } // YYYY/MM/DD
+  function inputFromSlash(v){
+    if(!v) return ""; const m=v.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+    if(!m) return ""; const mm=String(m[2]).padStart(2,'0'), dd=String(m[3]).padStart(2,'0'); return `${m[1]}-${mm}-${dd}`;
+  }
+
+  function renderScreen(data){
+    const h=(data&&data.header)||{};
+
+    // タイトル
+    const initTitle=(h.title&&(h.title.includes("市場")?"市場価格調査票":"見積書"))||"見積書";
+    $("title").textContent=initTitle; $("titleSel").value=initTitle; h.title=initTitle;
+    $("titleSel").addEventListener('change',()=>{h.title=$("titleSel").value;$("title").textContent=h.title;});
+
+    // 見積番号・日付
+    $("qno").textContent=h.quotation_no||"—";
+    const dateInput=$("date_input");
+    let inputVal=inputFromSlash(h.date)||todayInputValue();
+    dateInput.value=inputVal; h.date=slashFromInput(inputVal);
+    dateInput.addEventListener('input',()=>{ h.date=slashFromInput(dateInput.value); });
+
+    // 宛先
+    $("to_name").textContent=h.to_name||""; $("to_addr").textContent=h.to_addr||""; $("to_tel").textContent=h.to_tel||""; $("to_attn").textContent=h.to_attn||"";
+
+    // 発行元（任意5行）
+    const fromBox=$("from_free");
+    const initialFrom=h.from_free||[h.from_name,h.from_addr,h.from_tel,h.from_mail].filter(Boolean).join("\n");
+    fromBox.value=initialFrom; h.from_free=fromBox.value;
+    fromBox.addEventListener('input',()=>{h.from_free=fromBox.value;});
+
+    // 明細行
+    const tbody=document.querySelector("#items tbody"); tbody.innerHTML="";
+    const labels=["No","品名","規格","数量","単位","単価","金額","備考"];
+    const items=Array.isArray(data?.items)?data.items:[];
+    items.forEach((row,i)=>{
+      const baseNo=(row?.["No"]??(i+1));
+      row.__orig={規格:String(row?.["規格"]??""),単位:String(row?.["単位"]??""),備考:String(row?.["備考"]??""),NoText:String(baseNo)};
+      row["単価"]=""; const q=toNum(row?.["数量"]);
+      const tr=document.createElement("tr");
+      tr.innerHTML=`
+        <td class="num" id="no_${i}" data-label="${labels[0]}">${row.__orig.NoText}</td>
+        <td data-label="${labels[1]}">${escapeHtml(row?.["品名"]??"")}</td>
+        <td data-label="${labels[2]}"><textarea class="textbox ta spec" rows="1" data-idx="${i}">${escapeHtml(row.__orig.規格)}</textarea></td>
+        <td class="num" data-label="${labels[3]}">${q||""}</td>
+        <td data-label="${labels[4]}"><input class="textbox unit" data-idx="${i}" value="${escapeHtml(row.__orig.単位)}"/></td>
+        <td class="num" data-label="${labels[5]}"><input class="price" inputmode="decimal" autocomplete="off" data-idx="${i}" value=""></td>
+        <td class="num" data-label="${labels[6]}"><span id="amt_${i}"></span></td>
+        <td data-label="${labels[7]}"><textarea class="textbox ta remark" rows="1" data-idx="${i}">${escapeHtml(row.__orig.備考)}</textarea></td>`;
+      tbody.appendChild(tr);
+    });
+    document.querySelectorAll('textarea.ta').forEach(autoGrow);
+    tbody.addEventListener('input',(ev)=>{
+      const t=ev.target; if(!(t instanceof Element)||!t.matches('input,textarea'))return;
+      const idx=+t.dataset.idx; if(!isFinite(idx))return; const item=items[idx]; if(!item)return;
+      if(t.classList.contains('price')){item["単価"]=t.value;recalc(data);}
+      else if(t.classList.contains('spec')){item["規格"]=t.value;autoGrow(t);updateStar(idx,item);}
+      else if(t.classList.contains('unit')){item["単位"]=t.value;updateStar(idx,item);}
+      else if(t.classList.contains('remark')){item["備考"]=t.value;autoGrow(t);updateStar(idx,item);}
+    });
+
+    $("notes").textContent=h.notes||"";
+    recalc(data);
+  }
+
+  function updateStar(idx,item){
+    const o=item.__orig||{規格:"",単位:"",備考:"",NoText:String(idx+1)};
+    const ch=(String(item["規格"]??"")!==o.規格)||(String(item["単位"]??"")!==o.単位)||(String(item["備考"]??"")!==o.備考);
+    const cell=$("no_"+idx); if(cell) cell.textContent=o.NoText+(ch?"*":"");
+  }
+
+  function recalc(data){
+    let sum=0;
+    (data.items||[]).forEach((r,i)=>{
+      const q=toNum(r?.["数量"]); const p=toNum(r?.["単価"]); const amt=q*p;
+      sum+=(isFinite(amt)?amt:0);
+      const cell=$("amt_"+i);
+      if(cell) cell.textContent=(r["単価"]!=="")?fmtNoYen(amt):"";
+      updateStar(i,r);
+    });
+    $("lead_total").textContent=fmtJPYflex(sum);
+    $("grand").textContent=fmtJPYflex(sum);
+  }
+
+  /* ====== 長い連続文字列を自然に改行できるよう「通常スペース」を挿入 ======
+     ・数字：5桁以上の連続数字は4桁ごとにスペース
+     ・英数字長連続：12文字以上は8文字ごとにスペース
+     → ゼロ幅は使わない（×印対策） */
+  function safeWrap(s){
+    if(s==null) return "";
+    let r=String(s);
+    r=r.replace(/\d{5,}/g, m => m.replace(/(\d{4})(?=\d)/g,'$1 '));
+    r=r.replace(/[A-Za-z0-9#@_\-:.]{12,}/g, t => t.replace(/(.{8})(?=.)/g,'$1 '));
+    return r;
+  }
+
+  /* ===== PDF ===== */
+  function buildDocDefinition(data){
+    const h=(data&&data.header)||{};
+    const items=Array.isArray(data?.items)?data.items:[];
+    const rows=[[
+      {text:'No',bold:true,alignment:'right'},
+      {text:'品名',bold:true},
+      {text:'規格',bold:true},
+      {text:'数量',bold:true,alignment:'right'},
+      {text:'単位',bold:true},
+      {text:'単価',bold:true,alignment:'right'},
+      {text:'金額',bold:true,alignment:'right'},
+      {text:'備考',bold:true}
+    ]];
+
+    let sum=0;
+    for(let i=0;i<items.length;i++){
+      const r=items[i], q=toNum(r?.["数量"]), p=toNum(r?.["単価"]), amt=q*p;
+      const o=r.__orig||{規格:"",単位:"",備考:"",NoText:String(r?.["No"]??(i+1))};
+      const ch=(String(r?.["規格"]??"")!==o.規格)||(String(r?.["単位"]??"")!==o.単位)||(String(r?.["備考"]??"")!==o.備考);
+      const noText=(o.NoText||String(i+1))+(ch?"*":"");
+      sum+=(isFinite(amt)?amt:0);
+      rows.push([
+        {text:noText,alignment:'right'},
+        {text:(r?.["品名"]??""),noWrap:false},
+        {text:safeWrap(r?.["規格"]??""),noWrap:false},
+        {text:(q!==0?String(q):""),alignment:'right'},
+        {text:(r?.["単位"]??"")},
+        {text:(r["単価"]!==""?fmtNoYen(p):""),alignment:'right'},
+        {text:(r["単価"]!==""?fmtNoYen(amt):""),alignment:'right'},
+        {text:safeWrap(r?.["備考"]??""),noWrap:false}
+      ]);
+    }
+
+    const issuerText=(h.from_free&&String(h.from_free))||[h.from_name,h.from_addr,h.from_tel,h.from_mail].filter(Boolean).join("\n");
+
+    return {
+      pageSize:'A4',
+      pageMargins:[56.7,40,28,48], /* 左2cm */
+      info:{ title:h.title||'見積書', subject:h.quotation_no?`番号: ${h.quotation_no}`:'', author:h.from_name||'' },
+      defaultStyle:{ fontSize:10, font:'NotoSansJP' },
+      header:(currentPage,pageCount)=>({ text: currentPage + '/' + pageCount, alignment:'right', fontSize:9, margin:[0,8,28,0] }),
+      content:[
+        { text:(h.title||'見積書'), style:'title' },
+        { columns:[
+            { width:'*', stack:[ {text:'宛先',style:'label'},
+              { text:[h.to_name||'','\n',h.to_addr||'','\n',h.to_tel||'','\n',h.to_attn||''] } ] },
+            { width:'*', stack:[ {text:'発行元',style:'label'}, { text:issuerText } ] }
+          ], columnGap:18, margin:[0,6,0,6] },
+        { text:`見積番号：${h.quotation_no||''}　　発行日：${h.date||''}`, margin:[0,0,0,8] },
+        { text:'見積金額：'+fmtJPYflex(sum), style:'leadtotal' },
+        {
+          table:{
+            headerRows:1, dontBreakRows:true, keepWithHeaderRows:1,
+            /* 備考にやや多めに配分 */
+            widths:[22, 84, 92, 30, 26, 56, 60, '*'],
+            body:rows
+          },
+          layout:{
+            vLineWidth:()=>0,  /* 縦線なし */
+            hLineWidth:(i,node)=> (i===0||i===1||i===node.table.body.length)?1.2:0.6,
+            hLineColor:(i,node)=> (i===0||i===1||i===node.table.body.length)?'#444':'#aaa',
+            paddingLeft:()=>4, paddingRight:()=>3, paddingTop:()=>4, paddingBottom:()=>4
+          }
+        },
+        { columns:[
+            {width:'*',text:''},
+            { width:'auto', table:{ body:[[ {text:'合計',bold:true,alignment:'left'},
+                                            {text:fmtJPYflex(sum),bold:true,alignment:'right'} ]]},
+              layout:'noBorders', margin:[0,8,0,0] }
+          ]},
+        (h.notes ? { text:h.notes, margin:[0,10,0,0] } : { text:'' })
+      ],
+      styles:{ title:{fontSize:18,bold:true,margin:[0,0,0,8]}, label:{bold:true,color:'#666',margin:[0,4,0,2]}, leadtotal:{bold:true,margin:[0,0,0,6]} }
+    };
+  }
+
+  function ensureNoto(){
+    if(window.pdfMake&&!pdfMake.vfs&&window.vfs) pdfMake.vfs=window.vfs;
+    if(!window.pdfMake||!pdfMake.vfs){ setMsg("NG: pdfMake.vfs がありません"); return false; }
+    const NORMAL='NotoSansJP-Regular.ttf', BOLD='NotoSansJP-Bold.ttf';
+    if(pdfMake.vfs[NORMAL]&&pdfMake.vfs[BOLD]){
+      pdfMake.fonts={NotoSansJP:{normal:NORMAL,bold:BOLD,italics:NORMAL,bolditalics:BOLD}};
+      return true;
+    }
+    setMsg("⚠ vfs に NotoSansJP が見つかりません（キー名を確認）"); return false;
+  }
+
+  /* ===== メール関連 ===== */
+  function getPdfFileName(){ const h=(window.QUOTATION_DATA&&window.QUOTATION_DATA.header)||{}; return `quotation_${(h.quotation_no||'no')}_${(h.date||'')}.pdf`.replace(/[^\w\-\.]/g,'_')||'quotation.pdf'; }
+  function getMailSubject(){ const h=(window.QUOTATION_DATA&&window.QUOTATION_DATA.header)||{}; return (h.title||'見積書')+(h.quotation_no?`（${h.quotation_no}）`:''); }
+  function getMailBody(){ const h=(window.QUOTATION_DATA&&window.QUOTATION_DATA.header)||{}; return `書類をお送りします。${h.quotation_no?'\n番号：'+h.quotation_no:''}${h.date?'\n発行日：'+h.date:''}`; }
+  function getReplyTo(){ const e=(window.QUOTATION_DATA?.header?.to_attn||"").trim(); return e && e.includes("@") ? e : ""; }
+  function getToAddress(){ const e=(window.QUOTATION_DATA?.header?.to_attn||"").trim(); return e && e.includes("@") ? e : ""; }
+  function buildMailtoQuery(subject, body){ const q=new URLSearchParams(); if(subject) q.set("subject",subject); if(body) q.set("body",body); const rt=getReplyTo(); if(rt) q.set("reply-to",rt); return q.toString(); }
+
+  function previewPdf(data){
+    const okNoto=ensureNoto(); const dd=buildDocDefinition(data);
+    if(okNoto){ dd.defaultStyle=dd.defaultStyle||{}; dd.defaultStyle.font='NotoSansJP'; }
+    log("PDFを生成中…");
+    pdfMake.createPdf(dd).getBlob(blob=>{
+      const url=URL.createObjectURL(blob);
+      let ifr=$("pv"); if(!ifr){ const wrap=$("pvwrap"); ifr=document.createElement('iframe'); ifr.id='pv'; ifr.title='PDFプレビュー'; ifr.style.cssText="width:100%;height:70vh;border:0;border-radius:10px;display:block"; wrap.appendChild(ifr); }
+      const old=(ifr.dataset&&ifr.dataset.objurl)?ifr.dataset.objurl:null; if(old){ try{URL.revokeObjectURL(old);}catch{} }
+      if(ifr.dataset) ifr.dataset.objurl=url;
+      ifr.src=url; setTimeout(()=>log("OK: プレビューに表示しました"),50);
+    });
+  }
+
+  function downloadPdf(data,fileName){
+    const okNoto=ensureNoto(); const dd=buildDocDefinition(data);
+    if(okNoto){ dd.defaultStyle=dd.defaultStyle||{}; dd.defaultStyle.font='NotoSansJP'; }
+    pdfMake.createPdf(dd).getBlob(blob=>{
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a'); const canDownload=('download'in a)&&!isIOS;
+      if(canDownload){ a.href=url; a.download=fileName||'quotation.pdf'; document.body.appendChild(a); a.click(); a.remove(); log("OK: ダウンロード開始"); setTimeout(()=>URL.revokeObjectURL(url),60000); }
+      else{ const w=window.open(url,'_blank'); if(w){log("OK: 新しいタブでPDFを開きました"); setTimeout(()=>URL.revokeObjectURL(url),60000);} else log("⚠ ポップアップがブロック。プレビューで開いてください。"); }
+    });
+  }
+
+  function sharePdf(data,fileName,subject,body){
+    const okNoto=ensureNoto(); const dd=buildDocDefinition(data);
+    if(okNoto){ dd.defaultStyle=dd.defaultStyle||{}; dd.defaultStyle.font='NotoSansJP'; }
+    pdfMake.createPdf(dd).getBlob(async(blob)=>{
+      const file=new File([blob],fileName||'quotation.pdf',{type:'application/pdf'});
+      if(navigator.canShare&&navigator.canShare({files:[file]})){
+        try{ await navigator.share({files:[file],title:subject,text:body}); return; }catch(e){}
+      }
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a'); const canDownload=('download'in a)&&!isIOS;
+      if(canDownload){ a.href=url; a.download=fileName||'quotation.pdf'; document.body.appendChild(a); a.click(); a.remove(); setMsg("PDFをダウンロードしました。続けてメーラーを起動します（添付は手動）"); }
+      else{ const w=window.open(url,'_blank'); if(w) setMsg("PDFを新しいタブで開きました。続けてメーラーを起動します（添付は手動）"); else setMsg("⚠ ポップアップがブロックされました。プレビュー→保存後に添付してください。"); }
+      setTimeout(()=>URL.revokeObjectURL(url),60000);
+      const to=getToAddress();
+      const q =buildMailtoQuery(subject||'見積書',(body?body+'\n\n':'')+'（PDFを添付してください）\n'+(fileName||'quotation.pdf'));
+      setTimeout(()=>{ location.href='mailto:'+(to||'')+'?'+q; },400);
+    });
+  }
+
+  window.__click=function(kind){ runOnce(kind,function(){ try{
+    if(kind==='preview') previewPdf(window.QUOTATION_DATA);
+    else if(kind==='download') downloadPdf(window.QUOTATION_DATA,getPdfFileName());
+    else if(kind==='share')    sharePdf(window.QUOTATION_DATA,getPdfFileName(),getMailSubject(),getMailBody());
+    else if(kind==='mailto'){
+      const to=getToAddress();
+      const q =buildMailtoQuery(getMailSubject(), getMailBody()+'\n\n（PDFを添付してください）\n'+getPdfFileName());
+      location.href='mailto:'+(to||'')+'?'+q;
+    }
+  }catch(e){ console.error(e); setMsg("❌ クリック処理でエラー: "+(e?.message||e)); }}); };
+
+  (function start(){
+    setStat();
+    ["btn-preview","btn-download","btn-share","btn-mailto"].forEach(id=>{const b=$(id); if(b){ b.disabled=false; b.removeAttribute('disabled'); b.setAttribute('type','button'); }});
+    try{
+      if(window.__dataJsError){ setMsg("⚠ quotation_data.js を読み込めませんでした（同じフォルダ／ファイル名を確認）"); }
+      else if(!window.QUOTATION_DATA||typeof window.QUOTATION_DATA!=="object"){ setMsg("⚠ QUOTATION_DATA が見つからないか形式が不正です（window.QUOTATION_DATA = {...}）"); }
+      else{ renderScreen(window.QUOTATION_DATA); setMsg(""); }
+    }catch(e){ console.error(e); setMsg("❌ 表示時エラー: "+(e?.message||e)); }
+
+    /* 固定ツールバー分の余白（高さ変化・リサイズ追従） */
+    applyToolbarPadding();
+    const tb=$("toolbar");
+    if(window.ResizeObserver && tb){
+      const ro=new ResizeObserver(()=>applyToolbarPadding());
+      ro.observe(tb);
+      window.addEventListener('resize',applyToolbarPadding);
+    }else{
+      window.addEventListener('resize',applyToolbarPadding);
+    }
+
+    window.addEventListener('error',ev=>{ setMsg("❌ 実行時エラー: "+(ev?.message||ev?.error?.message||"不明")); });
+  })();
+  </script>
+</body>
+</html>
